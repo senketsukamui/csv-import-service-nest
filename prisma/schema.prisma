@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Import {
+  id            String        @id @default(uuid())
+  tenantId      String
+  fileName      String
+  filePath      String
+  status        ImportStatus  @default(PENDING)
+  processedRows Int           @default(0)
+  importedCount Int           @default(0)
+  errorCount    Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  finishedAt    DateTime
+  errors        ImportError[]
+  rows          ImportedRow[]
+
+  @@index([tenantId])
+}
+
+model ImportError {
+  id           String   @id @default(uuid())
+  importId     String
+  tenantId     String
+  line         Int
+  data         String
+  errorMessage String
+  createdAt    DateTime @default(now())
+
+  import Import @relation(fields: [importId], references: [id])
+
+  @@index([tenantId])
+  @@index([importId])
+}
+
+model ImportedRow {
+  id           String   @id @default(uuid())
+  importId     String
+  tenantId     String
+
+  import Import @relation(fields: [importId], references: [id])
+
+  @@index([tenantId])
+  @@index([importId])
+}
