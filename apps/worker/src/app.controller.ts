@@ -1,12 +1,15 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ImportProcessorService } from './processor/import-processor.service';
+import type { ImportMessage } from '@csv-import/contracts';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly processorService: ImportProcessorService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @MessagePattern('csv-imports')
+  async handleImport(@Payload() message: ImportMessage) {
+    const { importId } = message;
+    await this.processorService.process(importId);
   }
 }

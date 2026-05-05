@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { MinioModule } from '@csv-import/minio';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ImportProcessorService } from './processor/import-processor.service';
+import { ImportProcessorModule } from './processor/import-processor.module';
 
 @Module({
-  imports: [MinioModule],
+  imports: [ImportProcessorModule],
   controllers: [AppController],
-  providers: [AppService, ImportProcessorService],
+  providers: [AppService],
 })
 export class AppModule {}
