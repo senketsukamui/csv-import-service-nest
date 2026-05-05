@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CSV Import Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>CSV Import Demo</h1>
+
+      <form id="uploadForm">
+        <label>
+          API base
+          <input id="apiBase" type="url" value="http://localhost:3000" />
+        </label>
+
+        <label>
+          Consumer ID
+          <input id="consumerId" type="text" value="tenant-demo" />
+        </label>
+
+        <label>
+          CSV file
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+        </label>
+
+        <div class="actions">
+          <button type="submit">Upload</button>
+          <button id="sampleButton" type="button">Use sample</button>
+          <button id="refreshButton" type="button">Refresh</button>
+          <button id="errorsButton" type="button">Load errors</button>
+        </div>
+      </form>
+
+      <p id="message" role="status">Ready.</p>
+
+      <section>
+        <h2>Status</h2>
+        <dl>
+          <div>
+            <dt>Import ID</dt>
+            <dd id="importId">-</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd id="statusValue">Idle</dd>
+          </div>
+          <div>
+            <dt>Processed</dt>
+            <dd id="processedRows">0</dd>
+          </div>
+          <div>
+            <dt>Imported</dt>
+            <dd id="importedCount">0</dd>
+          </div>
+          <div>
+            <dt>Errors</dt>
+            <dd id="errorCount">0</dd>
+          </div>
+          <div>
+            <dt>File</dt>
+            <dd id="fileName">-</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Errors</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Line</th>
+              <th>Data</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="errorsBody">
+            <tr>
+              <td colspan="3">No errors loaded.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
