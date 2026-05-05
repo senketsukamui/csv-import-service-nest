@@ -8,7 +8,8 @@
     "format": "biome format . --write",
     "format:check": "biome format .",
     "dev:api": "pnpm --filter @csv-import/api dev",
-    "dev:worker": "pnpm --filter @csv-import/worker dev"
+    "dev:worker": "pnpm --filter @csv-import/worker dev",
+    "demo:frontend": "python3 -m http.server 5173 -d apps/frontend"
   },
   "keywords": [],
   "author": "",

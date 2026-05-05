@@ -4,6 +4,11 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: true,
+    allowedHeaders: ['content-type', 'x-consumer-id'],
+    methods: ['GET', 'POST', 'OPTIONS'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('CSV Import Service')
