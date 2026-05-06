@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:16
+    networks:
+      - csv-import-network
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -13,14 +15,31 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    networks:
+      - csv-import-network
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/csv_import
+    command: npx prisma migrate deploy --schema=/app/prisma/schema.prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
+    networks:
+      - csv-import-network
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
+    networks:
+      - csv-import-network
     depends_on:
       - zookeeper
     ports:
@@ -29,10 +48,27 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  minio-init:
+    image: minio/mc
+    networks:
+      - csv-import-network
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/csv-imports;
+      echo 'Bucket created';
+      "
 
   minio:
     image: minio/minio
+    networks:
+      - csv-import-network
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -50,6 +86,8 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    networks:
+      - csv-import-network
     ports:
       - "3000:3000"
     environment:
@@ -62,6 +100,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
       minio:
@@ -71,6 +111,8 @@ services:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+    networks:
+      - csv-import-network
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/csv_import
       KAFKA_BROKER: kafka:9092
@@ -81,7 +123,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       kafka:
         condition: service_started
       minio:
         condition: service_healthy
+
+networks:
+  csv-import-network:
+    driver: bridge
