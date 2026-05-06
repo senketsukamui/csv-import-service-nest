@@ -8,16 +8,16 @@ import {
   UploadedFile,
   UseInterceptors,
   HttpCode,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
-import { ImportsService } from './imports.service';
-import { MinioService } from '@csv-import/minio';
-import { KafkaProducerService } from '../kafka/kafka-producer.service';
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import type { Request } from "express";
+import { ImportsService } from "./imports.service";
+import { MinioService } from "@csv-import/minio";
+import { KafkaProducerService } from "../kafka/kafka-producer.service";
 
 type ConsumerRequest = Request & { consumerId: string };
 
-@Controller('imports')
+@Controller("imports")
 export class ImportsController {
   constructor(
     private readonly importsService: ImportsService,
@@ -27,7 +27,7 @@ export class ImportsController {
 
   @Post()
   @HttpCode(202)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor("file"))
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: ConsumerRequest,
@@ -47,17 +47,17 @@ export class ImportsController {
     return { importId: record.id };
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: ConsumerRequest) {
+  @Get(":id")
+  async findOne(@Param("id") id: string, @Req() req: ConsumerRequest) {
     const consumerId = req.consumerId;
     return this.importsService.findOne(id, consumerId);
   }
 
-  @Get(':id/errors')
+  @Get(":id/errors")
   async findErrors(
-    @Param('id') id: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '50',
+    @Param("id") id: string,
+    @Query("page") page = "1",
+    @Query("limit") limit = "50",
     @Req() req: ConsumerRequest,
   ) {
     const consumerId = req.consumerId;

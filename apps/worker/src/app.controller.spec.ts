@@ -1,8 +1,8 @@
-import { Test, type TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller';
-import { ImportProcessorService } from './processor/import-processor.service';
+import { Test, type TestingModule } from "@nestjs/testing";
+import { AppController } from "./app.controller";
+import { ImportProcessorService } from "./processor/import-processor.service";
 
-describe('AppController', () => {
+describe("AppController", () => {
   let appController: AppController;
   const processorService = {
     process: jest.fn(),
@@ -24,11 +24,11 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('handleImport', () => {
-    it('processes import messages', async () => {
-      await appController.handleImport({ importId: 'import-id' });
+  describe("handleImport", () => {
+    it("processes import messages", async () => {
+      await appController.handleImport({ importId: "import-id" });
 
-      expect(processorService.process).toHaveBeenCalledWith('import-id');
+      expect(processorService.process).toHaveBeenCalledWith("import-id");
     });
   });
 });

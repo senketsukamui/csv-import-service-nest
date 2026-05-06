@@ -1,6 +1,6 @@
-import { NestFactory } from '@nestjs/core';
-import { type MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { AppModule } from './app.module';
+import { NestFactory } from "@nestjs/core";
+import { type MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
@@ -9,10 +9,10 @@ async function bootstrap() {
       transport: Transport.KAFKA,
       options: {
         client: {
-          brokers: [process.env.KAFKA_BROKER ?? 'kafka:9092'],
+          brokers: [process.env.KAFKA_BROKER ?? "kafka:9092"],
         },
         consumer: {
-          groupId: 'csv-import-worker',
+          groupId: "csv-import-worker",
         },
       },
     },

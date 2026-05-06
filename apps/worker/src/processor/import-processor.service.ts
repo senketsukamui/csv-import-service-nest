@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient, ImportStatus } from '@prisma/client';
-import { MinioService } from '@csv-import/minio';
-import * as readline from 'readline';
-import { Readable } from 'stream';
+import { Injectable } from "@nestjs/common";
+import { PrismaClient, ImportStatus } from "@prisma/client";
+import { MinioService } from "@csv-import/minio";
+import * as readline from "node:readline";
+import { Readable } from "node:stream";
 
 @Injectable()
 export class ImportProcessorService {
@@ -57,8 +57,18 @@ export class ImportProcessorService {
 
     let rowNumber = 0;
     let headers: string[] = [];
-    let validBatch: any[] = [];
-    let errorBatch: any[] = [];
+    let validBatch: {
+      importId: string;
+      tenantId: string;
+      data: Record<string, string>;
+    }[] = [];
+    let errorBatch: {
+      importId: string;
+      tenantId: string;
+      line: number;
+      data: string;
+      errorMessage: string;
+    }[] = [];
     let processedRows = startFromRow;
 
     for await (const line of rl) {
@@ -123,7 +133,7 @@ export class ImportProcessorService {
 
   private parseCsvLine(line: string): string[] {
     const values: string[] = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
@@ -136,16 +146,16 @@ export class ImportProcessorService {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === "," && !inQuotes) {
         values.push(current.trim());
-        current = '';
+        current = "";
       } else {
         current += char;
       }
     }
 
     if (inQuotes) {
-      throw new Error('Unclosed quote in CSV line');
+      throw new Error("Unclosed quote in CSV line");
     }
 
     values.push(current.trim());
@@ -154,8 +164,18 @@ export class ImportProcessorService {
 
   private async flushBatch(
     importId: string,
-    batch: any[],
-    errorBatch: any[],
+    batch: {
+      importId: string;
+      tenantId: string;
+      data: Record<string, string>;
+    }[],
+    errorBatch: {
+      importId: string;
+      tenantId: string;
+      line: number;
+      data: string;
+      errorMessage: string;
+    }[],
     processedRows: number,
   ): Promise<void> {
     await this.prisma.$transaction([

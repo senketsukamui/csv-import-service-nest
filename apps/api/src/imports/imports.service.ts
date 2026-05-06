@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
 
 @Injectable()
 export class ImportsService {
@@ -16,7 +16,7 @@ export class ImportsService {
       where: { id, tenantId },
     });
 
-    if (!record) throw new NotFoundException('Import not found');
+    if (!record) throw new NotFoundException("Import not found");
     return record;
   }
 
@@ -31,7 +31,7 @@ export class ImportsService {
         where: { importId, tenantId },
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { line: 'asc' },
+        orderBy: { line: "asc" },
       }),
       this.prisma.importError.count({
         where: { importId, tenantId },
