@@ -57,6 +57,7 @@ model ImportedRow {
   id       String @id @default(uuid())
   importId String
   tenantId String
+  data     Json
 
   import Import @relation(fields: [importId], references: [id])
 

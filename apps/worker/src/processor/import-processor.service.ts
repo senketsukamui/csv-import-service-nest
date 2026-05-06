@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient, ImportStatus } from '@prisma/client';
+import { PrismaClient, ImportStatus } from '@prisma/client';
 import { MinioService } from '@csv-import/minio';
-import csvParser from 'csv-parser';
-import { Readable } from 'node:stream';
+import * as readline from 'readline';
+import { Readable } from 'stream';
 
 @Injectable()
 export class ImportProcessorService {
@@ -36,19 +36,13 @@ export class ImportProcessorService {
 
       await this.prisma.import.update({
         where: { id: importId },
-        data: {
-          status: ImportStatus.COMPLETED,
-          finishedAt: new Date(),
-        },
+        data: { status: ImportStatus.COMPLETED, finishedAt: new Date() },
       });
     } catch (error) {
       console.error(`Import ${importId} failed:`, error);
       await this.prisma.import.update({
         where: { id: importId },
-        data: {
-          status: ImportStatus.FAILED,
-          finishedAt: new Date(),
-        },
+        data: { status: ImportStatus.FAILED, finishedAt: new Date() },
       });
     }
   }
@@ -59,90 +53,109 @@ export class ImportProcessorService {
     tenantId: string,
     startFromRow: number,
   ): Promise<void> {
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
     let rowNumber = 0;
-    let batch: Prisma.ImportedRowCreateManyInput[] = [];
-    let errorBatch: Prisma.ImportErrorCreateManyInput[] = [];
+    let headers: string[] = [];
+    let validBatch: any[] = [];
+    let errorBatch: any[] = [];
     let processedRows = startFromRow;
 
-    await new Promise<void>((resolve, reject) => {
-      stream
-        .pipe(csvParser())
-        .on('data', async (row) => {
-          rowNumber++;
+    for await (const line of rl) {
+      if (rowNumber === 0) {
+        headers = this.parseCsvLine(line);
+        rowNumber++;
+        continue;
+      }
 
-          if (rowNumber <= startFromRow) return;
+      rowNumber++;
 
-          const { valid, errors } = this.validateRow(row);
+      if (rowNumber - 1 <= startFromRow) continue;
 
-          if (valid) {
-            batch.push({ importId, tenantId });
-          } else {
-            errorBatch.push({
-              importId,
-              tenantId,
-              line: rowNumber,
-              data: JSON.stringify(row),
-              errorMessage: errors.join(', '),
-            });
-          }
+      const { values, error } = this.safeParseLine(line);
 
-          if (batch.length + errorBatch.length >= 500) {
-            stream.pause();
-            try {
-              await this.flushBatch(
-                importId,
-                batch,
-                errorBatch,
-                processedRows + 500,
-              );
-              processedRows += 500;
-              batch = [];
-              errorBatch = [];
-            } finally {
-              stream.resume();
-            }
-          }
-        })
-        .on('end', async () => {
-          try {
-            if (batch.length > 0 || errorBatch.length > 0) {
-              await this.flushBatch(
-                importId,
-                batch,
-                errorBatch,
-                processedRows + batch.length + errorBatch.length,
-              );
-            }
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        })
-        .on('error', reject);
-    });
+      if (error) {
+        errorBatch.push({
+          importId,
+          tenantId,
+          line: rowNumber,
+          data: line,
+          errorMessage: error,
+        });
+      } else if (values.length !== headers.length) {
+        errorBatch.push({
+          importId,
+          tenantId,
+          line: rowNumber,
+          data: line,
+          errorMessage: `Expected ${headers.length} columns but got ${values.length}`,
+        });
+      } else {
+        const row = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
+        validBatch.push({ importId, tenantId, data: row });
+      }
+
+      if (validBatch.length + errorBatch.length >= 500) {
+        processedRows += validBatch.length + errorBatch.length;
+        await this.flushBatch(importId, validBatch, errorBatch, processedRows);
+        validBatch = [];
+        errorBatch = [];
+      }
+    }
+
+    if (validBatch.length > 0 || errorBatch.length > 0) {
+      processedRows += validBatch.length + errorBatch.length;
+      await this.flushBatch(importId, validBatch, errorBatch, processedRows);
+    }
   }
 
-  private validateRow(row: Record<string, string>): {
-    valid: boolean;
-    errors: string[];
+  private safeParseLine(line: string): {
+    values: string[];
+    error: string | null;
   } {
-    const errors: string[] = [];
+    try {
+      const values = this.parseCsvLine(line);
+      return { values, error: null };
+    } catch (e) {
+      return { values: [], error: (e as Error).message };
+    }
+  }
 
-    if (!row.name || row.name.trim() === '') {
-      errors.push('name is required');
+  private parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
     }
 
-    if (!row.email?.includes('@')) {
-      errors.push('email is invalid');
+    if (inQuotes) {
+      throw new Error('Unclosed quote in CSV line');
     }
 
-    return { valid: errors.length === 0, errors };
+    values.push(current.trim());
+    return values;
   }
 
   private async flushBatch(
     importId: string,
-    batch: Prisma.ImportedRowCreateManyInput[],
-    errorBatch: Prisma.ImportErrorCreateManyInput[],
+    batch: any[],
+    errorBatch: any[],
     processedRows: number,
   ): Promise<void> {
     await this.prisma.$transaction([
