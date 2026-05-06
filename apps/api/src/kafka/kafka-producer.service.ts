@@ -6,7 +6,7 @@ import { ImportMessage } from '@csv-import/contracts';
 export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private readonly kafka = new Kafka({
     clientId: 'csv-import-api',
-    brokers: [process.env.KAFKA_BROKER ?? 'localhost:9092'],
+    brokers: [process.env.KAFKA_BROKER ?? 'kafka:9092'],
   });
 
   private readonly producer: Producer = this.kafka.producer();

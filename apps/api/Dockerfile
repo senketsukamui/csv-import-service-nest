@@ -1,5 +1,6 @@
-FROM node:21-alpine
+FROM node:22-alpine
 
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 
 WORKDIR /app
@@ -18,9 +19,9 @@ COPY prisma ./prisma
 COPY tsconfig.json ./
 
 RUN pnpm --filter @csv-import/minio build
-
-RUN pnpm dlx prisma generate
+RUN npx prisma generate --schema=/app/prisma/schema.prisma
 
 WORKDIR /app/apps/api
+RUN pnpm build
 
-CMD ["pnpm", "start:dev"]
+CMD ["pnpm", "start:prod"]
