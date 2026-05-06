@@ -1,0 +1,7 @@
+name,email
+John,john@test.com
+Jane,jane@test.com
+"Unclosed quote,unclosed@test.com
+Bob,bob@test.com,extra-column
+,empty-name@test.com
+Mary,mary@test.com
