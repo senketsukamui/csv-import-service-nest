@@ -1,135 +1,140 @@
-const els = {
-  apiBase: document.querySelector("#apiBase"),
-  consumerId: document.querySelector("#consumerId"),
-  uploadForm: document.querySelector("#uploadForm"),
-  csvFile: document.querySelector("#csvFile"),
-  sampleButton: document.querySelector("#sampleButton"),
-  refreshButton: document.querySelector("#refreshButton"),
-  errorsButton: document.querySelector("#errorsButton"),
-  message: document.querySelector("#message"),
-  importId: document.querySelector("#importId"),
-  statusValue: document.querySelector("#statusValue"),
-  processedRows: document.querySelector("#processedRows"),
-  importedCount: document.querySelector("#importedCount"),
-  errorCount: document.querySelector("#errorCount"),
-  fileName: document.querySelector("#fileName"),
-  errorsBody: document.querySelector("#errorsBody"),
+'use strict';
+
+const el = {
+  form:          document.getElementById('form'),
+  apiBase:       document.getElementById('apiBase'),
+  consumerId:    document.getElementById('consumerId'),
+  csvFile:       document.getElementById('csvFile'),
+  uploadBtn:     document.getElementById('uploadBtn'),
+  msg:           document.getElementById('msg'),
+  statusCard:    document.getElementById('statusCard'),
+  importIdEl:    document.getElementById('importIdEl'),
+  badge:         document.getElementById('badge'),
+  processedRows: document.getElementById('processedRows'),
+  importedCount: document.getElementById('importedCount'),
+  errorCount:    document.getElementById('errorCount'),
+  fileName:      document.getElementById('fileName'),
+  errorsCard:    document.getElementById('errorsCard'),
+  errorsBody:    document.getElementById('errorsBody'),
 };
 
-const sampleCsv = `name,email
-John,john@test.com
-Jane,jane@test.com
-Bad,not-an-email
-`;
+let pollTimer = null;
+let polling   = false;
+let currentId = null;
 
-let currentImportId = "";
-let pollTimer = 0;
-
-function setMessage(text, isError = false) {
-  els.message.textContent = text;
-  els.message.classList.toggle("error", isError);
+function baseUrl() {
+  return el.apiBase.value.trim().replace(/\/$/, '');
 }
 
-function apiUrl(path) {
-  return `${els.apiBase.value.replace(/\/$/, "")}${path}`;
+function reqHeaders() {
+  return { 'x-consumer-id': el.consumerId.value.trim() };
 }
 
-function headers() {
-  return { "x-consumer-id": els.consumerId.value.trim() };
+function setMsg(text, isError) {
+  el.msg.textContent = text;
+  el.msg.className = isError ? 'msg error' : 'msg';
 }
 
-async function request(path, options = {}) {
-  const response = await fetch(apiUrl(path), {
-    ...options,
-    headers: { ...headers(), ...options.headers },
+function setBadge(status) {
+  el.badge.textContent = status;
+  el.badge.className = 'badge ' + status.toLowerCase();
+}
+
+function fmt(n) {
+  return n == null ? '—' : Number(n).toLocaleString();
+}
+
+function applyStatus(rec) {
+  el.importIdEl.textContent  = rec.id;
+  el.fileName.textContent    = rec.fileName || '';
+  el.processedRows.textContent = fmt(rec.processedRows);
+  el.importedCount.textContent = fmt(rec.importedCount);
+  el.errorCount.textContent    = fmt(rec.errorCount);
+  setBadge(rec.status);
+}
+
+async function apiFetch(path, opts) {
+  const res = await fetch(baseUrl() + path, {
+    ...opts,
+    headers: { ...reqHeaders(), ...(opts && opts.headers) },
   });
+  if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+  return res.json();
+}
 
-  if (!response.ok) {
-    throw new Error((await response.text()) || `HTTP ${response.status}`);
+function stopPoll() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+async function fetchErrors() {
+  const res = await apiFetch(`/imports/${currentId}/errors?page=1&limit=50`);
+  if (!res.data || !res.data.length) return;
+
+  el.errorsBody.replaceChildren();
+  for (const err of res.data) {
+    const tr = el.errorsBody.insertRow();
+    tr.insertCell().textContent = err.line;
+    tr.insertCell().textContent = err.data;
+    tr.insertCell().textContent = err.errorMessage;
   }
-
-  return response.json();
+  el.errorsCard.classList.remove('hidden');
 }
 
-function setButtons() {
-  const hasImport = Boolean(currentImportId);
-  els.refreshButton.disabled = !hasImport;
-  els.errorsButton.disabled = !hasImport;
-}
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    const rec = await apiFetch(`/imports/${currentId}`);
+    applyStatus(rec);
 
-async function upload(file) {
-  const body = new FormData();
-  body.append("file", file);
-
-  setMessage(`Uploading ${file.name}...`);
-  const result = await request("/imports", { method: "POST", body });
-  currentImportId = result.importId;
-  els.importId.textContent = currentImportId;
-  setButtons();
-  await refresh();
-
-  window.clearInterval(pollTimer);
-  pollTimer = window.setInterval(refresh, 2500);
-}
-
-async function refresh() {
-  if (!currentImportId) return;
-
-  const record = await request(`/imports/${currentImportId}`);
-  els.importId.textContent = record.id;
-  els.statusValue.textContent = record.status;
-  els.processedRows.textContent = record.processedRows;
-  els.importedCount.textContent = record.importedCount;
-  els.errorCount.textContent = record.errorCount;
-  els.fileName.textContent = record.fileName;
-  setMessage(`Import ${record.status.toLowerCase()}.`);
-
-  if (record.status === "COMPLETED" || record.status === "FAILED") {
-    window.clearInterval(pollTimer);
-  }
-}
-
-async function loadErrors() {
-  if (!currentImportId) return;
-
-  const result = await request(`/imports/${currentImportId}/errors?page=1&limit=50`);
-  els.errorsBody.replaceChildren();
-
-  if (result.data.length === 0) {
-    els.errorsBody.innerHTML = `<tr><td colspan="3">No validation errors.</td></tr>`;
-    return;
-  }
-
-  for (const error of result.data) {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td>${error.line}</td><td><code></code></td><td></td>`;
-    row.children[1].firstChild.textContent = error.data;
-    row.children[2].textContent = error.errorMessage;
-    els.errorsBody.append(row);
+    if (rec.status === 'COMPLETED' || rec.status === 'FAILED') {
+      stopPoll();
+      el.uploadBtn.disabled = false;
+      setMsg(rec.status === 'COMPLETED' ? 'Import complete.' : 'Import failed.');
+      if (rec.errorCount > 0) await fetchErrors();
+    }
+  } catch (err) {
+    stopPoll();
+    el.uploadBtn.disabled = false;
+    setMsg(err.message, true);
+  } finally {
+    polling = false;
   }
 }
 
-els.uploadForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const file = els.csvFile.files[0];
-  if (!file) {
-    setMessage("Choose a CSV file first.", true);
-    return;
+el.form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const file = el.csvFile.files[0];
+  if (!file) { setMsg('Select a CSV file first.', true); return; }
+
+  stopPoll();
+  polling = false;
+  el.errorsCard.classList.add('hidden');
+  el.errorsBody.replaceChildren();
+  el.uploadBtn.disabled = true;
+  setMsg('Uploading…');
+
+  try {
+    const body = new FormData();
+    body.append('file', file);
+    const data = await apiFetch('/imports', { method: 'POST', body });
+    currentId = data.importId;
+
+    el.importIdEl.textContent    = currentId;
+    el.fileName.textContent      = file.name;
+    el.processedRows.textContent = '0';
+    el.importedCount.textContent = '0';
+    el.errorCount.textContent    = '0';
+    setBadge('PENDING');
+    el.statusCard.classList.remove('hidden');
+    setMsg('Processing…');
+
+    pollTimer = setInterval(poll, 2000);
+    poll();
+  } catch (err) {
+    setMsg(err.message, true);
+    el.uploadBtn.disabled = false;
   }
-  upload(file).catch((error) => setMessage(error.message, true));
 });
-
-els.sampleButton.addEventListener("click", () => {
-  const file = new File([sampleCsv], "sample-import.csv", { type: "text/csv" });
-  upload(file).catch((error) => setMessage(error.message, true));
-});
-
-els.refreshButton.addEventListener("click", () => {
-  refresh().catch((error) => setMessage(error.message, true));
-});
-
-els.errorsButton.addEventListener("click", () => {
-  loadErrors().catch((error) => setMessage(error.message, true));
-});
-
-setButtons();
