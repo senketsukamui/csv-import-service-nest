@@ -1,25 +1,26 @@
-import { IsNotEmpty } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class ImportErrorDto {
-  @IsNotEmpty()
+  @ApiProperty({ example: 42 })
   line: number;
 
-  @IsNotEmpty()
+  @ApiProperty({ example: "John,not-an-email" })
   data: string;
 
-  @IsNotEmpty()
+  @ApiProperty({ example: "Expected 3 columns but got 2" })
   errorMessage: string;
 }
 
 export class ImportErrorsResponseDto {
-  @IsNotEmpty()
+  @ApiProperty({ type: [ImportErrorDto] })
   data: ImportErrorDto[];
 
-  @IsNotEmpty()
+  @ApiProperty({ example: 2 })
   total: number;
 
-  @IsNotEmpty()
+  @ApiProperty({ example: 1 })
   page: number;
 
+  @ApiProperty({ example: 50 })
   limit: number;
 }

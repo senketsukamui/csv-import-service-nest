@@ -14,6 +14,15 @@ async function bootstrap() {
     .setTitle("CSV Import Service")
     .setDescription("API for importing CSV files")
     .setVersion("1.0")
+    .addApiKey(
+      {
+        type: "apiKey",
+        in: "header",
+        name: "x-consumer-id",
+        description: "Tenant identifier",
+      },
+      "x-consumer-id",
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api", app, document);
