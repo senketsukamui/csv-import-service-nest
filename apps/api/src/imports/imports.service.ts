@@ -1,14 +1,19 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
+import { MetricsService } from "../metrics/metrics.service";
 
 @Injectable()
 export class ImportsService {
   private readonly prisma = new PrismaClient();
 
+  constructor(private readonly metricsService: MetricsService) {}
+
   async createImport(tenantId: string, fileName: string, filePath: string) {
-    return this.prisma.import.create({
+    const record = await this.prisma.import.create({
       data: { tenantId, fileName, filePath },
     });
+    this.metricsService.importsCreated.inc({ tenant_id: tenantId });
+    return record;
   }
 
   async findOne(id: string, tenantId: string) {
