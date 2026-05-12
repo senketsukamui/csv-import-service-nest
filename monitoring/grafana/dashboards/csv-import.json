@@ -1,0 +1,226 @@
+{
+  "title": "CSV Import Service",
+  "uid": "csv-import-overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "timezone": "browser",
+  "tags": ["csv-import"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "annotations": { "list": [] },
+  "links": [],
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Imports Created (24 h)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "color": { "mode": "thresholds" } } },
+      "targets": [
+        {
+          "expr": "increase(imports_created_total[24h])",
+          "legendFormat": "Created",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Completed (24 h)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "color": { "mode": "thresholds" } } },
+      "targets": [
+        {
+          "expr": "increase(imports_processed_total{status=\"completed\"}[24h])",
+          "legendFormat": "Completed",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Failed (24 h)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "color": { "mode": "thresholds" } } },
+      "targets": [
+        {
+          "expr": "increase(imports_processed_total{status=\"failed\"}[24h])",
+          "legendFormat": "Failed",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Success Rate (24 h)",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 90 }, { "color": "green", "value": 99 }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "increase(imports_processed_total{status=\"completed\"}[24h]) / clamp_min(increase(imports_processed_total[24h]), 1) * 100",
+          "legendFormat": "Success %",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (route, method) (rate(http_request_duration_seconds_count{job=\"api\"}[1m]))",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "HTTP Latency (P50 / P95 / P99)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[5m])))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[5m])))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[5m])))",
+          "legendFormat": "P99"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "CSV Rows / sec",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rows/s",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(csv_rows_processed_total{job=\"worker\"}[1m])",
+          "legendFormat": "Valid rows/s"
+        },
+        {
+          "expr": "rate(csv_rows_errored_total{job=\"worker\"}[1m])",
+          "legendFormat": "Error rows/s"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Import Processing Duration P95",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(import_processing_duration_seconds_bucket{job=\"worker\"}[5m])))",
+          "legendFormat": "P95 duration"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Heap Memory Used",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "nodejs_heap_size_used_bytes{job=\"api\"}",
+          "legendFormat": "API heap"
+        },
+        {
+          "expr": "nodejs_heap_size_used_bytes{job=\"worker\"}",
+          "legendFormat": "Worker heap"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Event Loop Lag",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_seconds{job=\"api\"}",
+          "legendFormat": "API event loop lag"
+        },
+        {
+          "expr": "nodejs_eventloop_lag_seconds{job=\"worker\"}",
+          "legendFormat": "Worker event loop lag"
+        }
+      ]
+    }
+  ]
+}
