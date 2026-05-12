@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaClient, ImportStatus } from "@prisma/client";
 import { MinioService } from "@csv-import/minio";
+import { MetricsService } from "../metrics/metrics.service";
 import * as readline from "node:readline";
 import { Readable } from "node:stream";
 
@@ -8,7 +9,10 @@ import { Readable } from "node:stream";
 export class ImportProcessorService {
   private readonly prisma = new PrismaClient();
 
-  constructor(private readonly minioService: MinioService) {}
+  constructor(
+    private readonly minioService: MinioService,
+    private readonly metricsService: MetricsService,
+  ) {}
 
   async process(importId: string): Promise<void> {
     const record = await this.prisma.import.findUnique({
@@ -25,6 +29,8 @@ export class ImportProcessorService {
       data: { status: ImportStatus.PROCESSING },
     });
 
+    const endTimer = this.metricsService.importProcessingDuration.startTimer();
+
     try {
       const stream = await this.minioService.getStream(record.filePath);
       await this.parseAndSave(
@@ -38,12 +44,16 @@ export class ImportProcessorService {
         where: { id: importId },
         data: { status: ImportStatus.COMPLETED, finishedAt: new Date() },
       });
+      endTimer();
+      this.metricsService.importsProcessed.inc({ status: "completed" });
     } catch (error) {
       console.error(`Import ${importId} failed:`, error);
       await this.prisma.import.update({
         where: { id: importId },
         data: { status: ImportStatus.FAILED, finishedAt: new Date() },
       });
+      endTimer();
+      this.metricsService.importsProcessed.inc({ status: "failed" });
     }
   }
 
@@ -194,5 +204,12 @@ export class ImportProcessorService {
         },
       }),
     ]);
+
+    if (batch.length > 0) {
+      this.metricsService.csvRowsProcessed.inc(batch.length);
+    }
+    if (errorBatch.length > 0) {
+      this.metricsService.csvRowsErrored.inc(errorBatch.length);
+    }
   }
 }
